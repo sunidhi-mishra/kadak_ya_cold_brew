@@ -58,6 +58,7 @@ export const CupInteraction: React.FC<CupInteractionProps> = ({ side }) => {
   };
 
   const refillLiquid = () => {
+    audioSynth.playPour();
     const interval = window.setInterval(() => {
       setLiquidLevel((prev) => {
         if (prev >= 100) {
