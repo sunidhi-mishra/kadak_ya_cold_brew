@@ -80,13 +80,13 @@ export const App: React.FC = () => {
           text: shareText,
           url: shareUrl,
         });
-      } catch {}
+      } catch { }
     } else {
       try {
         await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -106,11 +106,11 @@ export const App: React.FC = () => {
     : { backgroundImage: 'linear-gradient(90deg, rgba(255, 255, 255, 0.007) 1px, transparent 1px), radial-gradient(circle at 50% 50%, #110e0d 0%, #060505 100%)' };
 
   return (
-    <div 
+    <div
       style={bgStyle}
       className="h-screen w-screen overflow-hidden flex flex-col justify-between font-mono text-creamText relative"
     >
-      
+
       {/* Header bar (restored divider and background block style) */}
       <header className="h-14 border-b border-neutral-900 bg-black/40 px-6 flex justify-between items-center select-none shrink-0 z-40">
         <div className="flex flex-col">
@@ -165,13 +165,13 @@ export const App: React.FC = () => {
 
       {/* Main Sandbox Canvas */}
       <main className="flex-1 w-full mx-auto px-12 pt-6 pb-6 grid grid-cols-12 gap-8 items-end overflow-hidden min-h-0 relative">
-        
+
         {/* Left Side: Floating messages */}
         <section className="col-span-4 h-full max-h-[90%] flex flex-col justify-end overflow-hidden">
-          <ChatRoom 
-            messages={messages} 
-            currentUser={user.username} 
-            onReact={handleReact} 
+          <ChatRoom
+            messages={messages}
+            currentUser={user.username}
+            onReact={handleReact}
           />
         </section>
 
@@ -192,7 +192,7 @@ export const App: React.FC = () => {
       {/* Full-width Bottom input console bar */}
       <footer className="h-12 border-t border-neutral-900/60 bg-black/20 flex items-center shrink-0 z-30">
         <form onSubmit={handleSendMessage} className="w-full h-full flex items-center justify-between">
-          
+
           {/* User Name Tag */}
           <div className={`px-6 h-full flex items-center font-bold text-xs select-none uppercase ${userThemeColor}`}>
             {user.username}
@@ -216,11 +216,10 @@ export const App: React.FC = () => {
           <button
             type="submit"
             disabled={!inputText.trim()}
-            className={`h-full px-8 text-xs font-bold uppercase tracking-widest transition-all ${
-              inputText.trim() 
-                ? 'bg-chaiOrange text-white hover:brightness-110 active:scale-95' 
+            className={`h-full px-8 text-xs font-bold uppercase tracking-widest transition-all ${inputText.trim()
+                ? 'bg-chaiOrange text-white hover:brightness-110 active:scale-95'
                 : 'bg-neutral-900/40 text-softGray/30 cursor-not-allowed'
-            }`}
+              }`}
           >
             SEND
           </button>

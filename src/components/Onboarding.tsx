@@ -35,9 +35,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onJoin }) => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-warmBg px-6 select-none animate-fade-in">
-      <div className="text-center mb-16 max-w-md">
-        <h1 className="text-4xl sm:text-5xl font-extrabold font-display tracking-tight text-creamText mb-4">
-          Kadak ya Cold Brew
+      <div className="text-center mb-16 max-w-2xl">
+        <h1 className="text-4xl sm:text-5xl font-extrabold font-display tracking-tight text-creamText mb-4 whitespace-nowrap">
+          Kadak ya Cold Brew ? 🤔💭
         </h1>
         <p className="text-softGray text-sm sm:text-base tracking-wide uppercase">
           Pick your side · Enter the match
