@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { audioSynth } from '../services/audioSynth';
+import { mockDb } from '../services/mockDb';
 
 interface CupInteractionProps {
   side: 'chai' | 'coffee';
@@ -45,13 +46,14 @@ export const CupInteraction: React.FC<CupInteractionProps> = ({ side }) => {
 
   const triggerSlurpTick = (isFirst: boolean) => {
     audioSynth.playSlurp(isFirst);
+    mockDb.registerSip(side);
     setIsTilting(true);
     setTimeout(() => setIsTilting(false), 200);
     setIsRippling(true);
     setTimeout(() => setIsRippling(false), 250);
 
     if (navigator.vibrate) {
-      try {
+       try {
         navigator.vibrate(10);
       } catch {}
     }

@@ -27,6 +27,8 @@ export interface Stats {
   displayedChaiPercent: number;
   displayedCoffeePercent: number;
   commentaryLine: string;
+  commentaryIndex?: number;
+  entriesCount?: number;
 }
 
 export interface UserPresence {
@@ -39,30 +41,32 @@ export interface UserPresence {
 // Cricket-commentary-style templates based on margin
 const commentaryTemplates = {
   nailBiter: [
-    "Nail-biter! Chai edges ahead by a whisker ☕",
-    "It's a tight single! Coffee and Chai running neck and neck 🍵 ☕",
-    "Super Over territory! Neither side giving an inch!",
-    "Chai trying to consolidate, but Coffee is bowling a tight spell 🏏",
-    "A clean sweep is unlikely here, both teams locking horns!"
+    "Nail-biter! {winner} edges ahead of {loser} by a whisker ☕",
+    "It's a tight single! {winner} and {loser} are running neck and neck 🍵",
+    "Super Over territory! {winner} leads, but {loser} is chasing closely!",
+    "{winner} is trying to consolidate, but {loser} is bowling a tight spell 🏏",
+    "A clean sweep is unlikely here, both {winner} and {loser} locking horns!"
   ],
   comfortableLead: [
-    "Chai's cruising at a healthy run rate today ☕",
-    "Coffee's found its rhythm, pulling off a comfortable lead 🍵",
-    "A solid middle-overs partnership here. Chai looking steady.",
-    "Coffee is finding the gaps nicely, building a solid boundary lead 🏏",
-    "Chai is controlling the tempo now, dictating play."
+    "{winner} is cruising at a healthy run rate against {loser} ☕",
+    "{winner} has found its rhythm, pulling off a comfortable lead over {loser} 🍵",
+    "A solid middle-overs partnership here. {winner} looking steady against {loser}.",
+    "{winner} is finding the gaps nicely, building a solid boundary lead over {loser} 🏏",
+    "{winner} is controlling the tempo now, dictating play against {loser}."
   ],
   blowout: [
-    "Coffee's been bowled out early, Chai declares the innings ☕😏",
-    "An absolute masterclass! Coffee is hitting sixes out of the park 🍵💥",
-    "Chai dominates the pitch completely today!",
-    "A clean innings defeat looms for Coffee if they don't step up 🏏"
+    "{loser} has been bowled out early, {winner} declares the innings ☕😏",
+    "An absolute masterclass! {winner} is hitting sixes out of the park against {loser} 🍵💥",
+    "{winner} dominates the pitch completely today against {loser}!",
+    "A clean innings defeat looms for {loser} if they don't step up against {winner} 🏏",
+    "Total domination! {winner} is completely outclassing {loser} in this match!"
   ]
 };
 
-function getCommentary(chaiPercent: number, coffeePercent: number): string {
+function getCommentary(chaiPercent: number, coffeePercent: number, index: number): string {
   const margin = Math.abs(chaiPercent - coffeePercent);
-  const leadingSide = chaiPercent > coffeePercent ? 'Chai' : 'Coffee';
+  const leadingSide = chaiPercent >= coffeePercent ? 'Chai' : 'Coffee';
+  const trailingSide = leadingSide === 'Chai' ? 'Coffee' : 'Chai';
   const templates =
     margin < 10
       ? commentaryTemplates.nailBiter
@@ -70,8 +74,9 @@ function getCommentary(chaiPercent: number, coffeePercent: number): string {
       ? commentaryTemplates.comfortableLead
       : commentaryTemplates.blowout;
 
-  const template = templates[Math.floor(Math.random() * templates.length)];
-  return template.replace(/Chai/g, leadingSide).replace(/Coffee/g, leadingSide === 'Chai' ? 'Coffee' : 'Chai');
+  const loopIndex = (index || 0) % 5;
+  const template = templates[loopIndex];
+  return template.replace(/{winner}/g, leadingSide).replace(/{loser}/g, trailingSide);
 }
 
 // Caches for synchronous getters
@@ -82,7 +87,8 @@ let cachedStats: Stats = {
   lastUpdated: Date.now(),
   displayedChaiPercent: 55,
   displayedCoffeePercent: 45,
-  commentaryLine: "The match is underway! Chai takes an early lead ☕"
+  commentaryLine: "The match is underway! Chai takes an early lead ☕",
+  entriesCount: 5
 };
 let cachedPresence: UserPresence[] = [];
 
@@ -101,7 +107,8 @@ onValue(ref(db, 'stats'), (snapshot) => {
       lastUpdated: Date.now(),
       displayedChaiPercent: 55,
       displayedCoffeePercent: 45,
-      commentaryLine: "The match is underway! Chai takes an early lead ☕"
+      commentaryLine: "The match is underway! Chai takes an early lead ☕",
+      entriesCount: 5
     });
     return;
   }
@@ -208,7 +215,9 @@ export const mockDb = {
           lastUpdated: Date.now(),
           displayedChaiPercent: side === 'chai' ? 100 : 0,
           displayedCoffeePercent: side === 'coffee' ? 100 : 0,
-          commentaryLine: "The match is underway!"
+          commentaryLine: "The match is underway! 🏏",
+          commentaryIndex: 0,
+          entriesCount: 1
         };
       }
       if (side === 'chai') {
@@ -217,12 +226,40 @@ export const mockDb = {
         currentStats.coffeeCount = (currentStats.coffeeCount || 0) + 1;
       }
       
+      currentStats.entriesCount = (currentStats.entriesCount || 0) + 1;
+
       const total = currentStats.chaiCount + currentStats.coffeeCount;
       if (total > 0) {
         currentStats.displayedChaiPercent = Math.round((currentStats.chaiCount / total) * 100);
         currentStats.displayedCoffeePercent = 100 - currentStats.displayedChaiPercent;
       }
       
+      return currentStats;
+    });
+  },
+
+  registerSip(side: 'chai' | 'coffee'): void {
+    const statsRef = ref(db, 'stats');
+    runTransaction(statsRef, (currentStats) => {
+      if (!currentStats) return currentStats;
+      if (side === 'chai') {
+        currentStats.chaiCount = (currentStats.chaiCount || 0) + 1;
+      } else {
+        currentStats.coffeeCount = (currentStats.coffeeCount || 0) + 1;
+      }
+      
+      const total = currentStats.chaiCount + currentStats.coffeeCount;
+      if (total > 0) {
+        const chaiP = Math.round((currentStats.chaiCount / total) * 100);
+        const coffeeP = 100 - chaiP;
+        currentStats.displayedChaiPercent = chaiP;
+        currentStats.displayedCoffeePercent = coffeeP;
+        
+        // Loop sequential index from 0 to 4
+        const nextIndex = ((currentStats.commentaryIndex || 0) + 1) % 5;
+        currentStats.commentaryIndex = nextIndex;
+        currentStats.commentaryLine = getCommentary(chaiP, coffeeP, nextIndex);
+      }
       return currentStats;
     });
   },
@@ -263,11 +300,13 @@ export const mockDb = {
       }
       currentStats.displayedChaiPercent = chaiP;
       currentStats.displayedCoffeePercent = coffeeP;
-      currentStats.commentaryLine = getCommentary(chaiP, coffeeP);
+      currentStats.commentaryIndex = 0;
+      currentStats.commentaryLine = getCommentary(chaiP, coffeeP, 0);
       currentStats.lastUpdated = Date.now();
-      // Reset hourly sip entries back to zero for the next round
+      // Reset hourly sip entries & session counts back to zero for the next round
       currentStats.chaiCount = 0;
       currentStats.coffeeCount = 0;
+      currentStats.entriesCount = 0;
       return currentStats;
     });
   }

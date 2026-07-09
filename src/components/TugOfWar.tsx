@@ -61,9 +61,8 @@ export const TugOfWar: React.FC = () => {
         <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-black/80 -translate-x-1/2" />
       </div>
 
-      {/* Stats Footer Details */}
       <div className="flex justify-between items-center mt-2 text-[10px] text-softGray/40">
-        <span>ENTRIES: {stats.chaiCount + stats.coffeeCount}</span>
+        <span>ENTRIES: {stats.entriesCount || 0}</span>
         <span>NEXT TICK: <strong className="text-creamText">{timeLeftStr || '--'}</strong></span>
       </div>
 
