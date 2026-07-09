@@ -2,6 +2,16 @@
 
 **Kadak ya Cold Brew** is a real-time, interactive web application pitting Chai lovers against Coffee enthusiasts in a live hourly tug-of-war match. Playable globally with zero authentication required! 🤼‍♂️🌍✨
 
+<br />
+
+<p align="center">
+  <a href="https://kadakyacoldbrew.web.app/" target="_blank">
+    <img src="https://img.shields.io/badge/PLAY_LIVE_GAME-Kadak_ya_Cold_Brew_%3F-orange?style=for-the-badge&logo=coffeescript&logoColor=white" alt="Play Live Game" />
+  </a>
+</p>
+
+<br />
+
 ---
 
 ## 🚀 Key Features
