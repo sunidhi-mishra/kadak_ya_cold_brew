@@ -1,5 +1,15 @@
-// Mock Realtime Database Service using BroadcastChannel and localStorage
-// Allows instant multi-tab synchronization without Firebase.
+import { db } from '../firebaseConfig';
+import { 
+  ref, 
+  onValue, 
+  push, 
+  set, 
+  runTransaction, 
+  limitToLast, 
+  query, 
+  onDisconnect, 
+  serverTimestamp 
+} from 'firebase/database';
 
 export interface Message {
   id: string;
@@ -26,9 +36,6 @@ export interface UserPresence {
   lastSeen: number;
 }
 
-const STATS_KEY = 'kadak_stats_v1';
-const CHAT_KEY = 'kadak_chat_v1';
-
 // Cricket-commentary-style templates based on margin
 const commentaryTemplates = {
   nailBiter: [
@@ -48,17 +55,14 @@ const commentaryTemplates = {
   blowout: [
     "Coffee's been bowled out early, Chai declares the innings ☕😏",
     "An absolute masterclass! Coffee is hitting sixes out of the park 🍵💥",
-    "Chai is running away with the match, Coffee needs a miracle!",
-    "A clean innings defeat looms for Coffee if they don't step up 🏏",
-    "Chai dominates the pitch completely today!"
+    "Chai dominates the pitch completely today!",
+    "A clean innings defeat looms for Coffee if they don't step up 🏏"
   ]
 };
 
-// Helper to select commentary
 function getCommentary(chaiPercent: number, coffeePercent: number): string {
   const margin = Math.abs(chaiPercent - coffeePercent);
   const leadingSide = chaiPercent > coffeePercent ? 'Chai' : 'Coffee';
-  const leadingEmoji = leadingSide === 'Chai' ? '☕' : '🍵';
   const templates =
     margin < 10
       ? commentaryTemplates.nailBiter
@@ -70,272 +74,206 @@ function getCommentary(chaiPercent: number, coffeePercent: number): string {
   return template.replace(/Chai/g, leadingSide).replace(/Coffee/g, leadingSide === 'Chai' ? 'Coffee' : 'Chai');
 }
 
-// Initial stats if not present
-const getInitialStats = (): Stats => {
-  const defaultStats: Stats = {
-    chaiCount: 15, // start with some fun initial counts
-    coffeeCount: 12,
-    lastUpdated: Date.now(),
-    displayedChaiPercent: 55,
-    displayedCoffeePercent: 45,
-    commentaryLine: "The match is underway! Chai takes an early lead ☕"
-  };
-
-  try {
-    const stored = localStorage.getItem(STATS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Auto-update hourly if needed
-      return checkAndRunHourlyUpdate(parsed);
-    }
-  } catch (e) {
-    console.error('Failed to read stats from localStorage', e);
-  }
-  
-  localStorage.setItem(STATS_KEY, JSON.stringify(defaultStats));
-  return defaultStats;
+// Caches for synchronous getters
+let cachedMessages: Message[] = [];
+let cachedStats: Stats = {
+  chaiCount: 15,
+  coffeeCount: 12,
+  lastUpdated: Date.now(),
+  displayedChaiPercent: 55,
+  displayedCoffeePercent: 45,
+  commentaryLine: "The match is underway! Chai takes an early lead ☕"
 };
+let cachedPresence: UserPresence[] = [];
 
-// Check if 1 hour has passed and recalculate percentages
-function checkAndRunHourlyUpdate(stats: Stats): Stats {
+// Database callbacks subscriptions
+const dbListeners = new Set<() => void>();
+const presenceListeners = new Set<(users: UserPresence[]) => void>();
+
+// Subscribe to Live Stats
+onValue(ref(db, 'stats'), (snapshot) => {
+  const data = snapshot.val();
+  if (!data) {
+    // Automatically seed initial stats if node is empty
+    set(ref(db, 'stats'), {
+      chaiCount: 15,
+      coffeeCount: 12,
+      lastUpdated: Date.now(),
+      displayedChaiPercent: 55,
+      displayedCoffeePercent: 45,
+      commentaryLine: "The match is underway! Chai takes an early lead ☕"
+    });
+    return;
+  }
+  cachedStats = data;
+  // Check client-side if we need to trigger an hourly update on Firebase
   const now = Date.now();
   const ONE_HOUR = 3600 * 1000;
-  if (now - stats.lastUpdated >= ONE_HOUR) {
-    const total = stats.chaiCount + stats.coffeeCount;
-    let chaiP = 50;
-    let coffeeP = 50;
-    if (total > 0) {
-      chaiP = Math.round((stats.chaiCount / total) * 100);
-      coffeeP = 100 - chaiP;
-    }
-    stats.displayedChaiPercent = chaiP;
-    stats.displayedCoffeePercent = coffeeP;
-    stats.commentaryLine = getCommentary(chaiP, coffeeP);
-    stats.lastUpdated = now;
-    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  if (now - cachedStats.lastUpdated >= ONE_HOUR) {
+    mockDb.forceHourlyUpdate();
+  } else {
+    dbListeners.forEach((cb) => cb());
   }
-  return stats;
-}
+});
 
-// Initial messages
-const getInitialMessages = (): Message[] => {
-  try {
-    const stored = localStorage.getItem(CHAT_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Failed to read chat from localStorage', e);
-  }
-  // Default welcoming comments
-  const defaultMessages: Message[] = [
-    {
-      id: 'welcome-1',
+// Subscribe to Live Chat (last 15 messages)
+const chatQuery = query(ref(db, 'chat/messages'), limitToLast(15));
+onValue(chatQuery, (snapshot) => {
+  const data = snapshot.val();
+  if (!data) {
+    // Automatically seed default messages if node is empty
+    const messagesRef = ref(db, 'chat/messages');
+    const welcome1 = push(messagesRef);
+    set(welcome1, {
       side: 'chai',
       username: 'Adrak-42',
       text: 'Welcome to Kadak Ya Cold Brew! Tap the cup to sip ☕',
-      timestamp: Date.now() - 60000 * 5,
+      timestamp: Date.now() - 300000, // 5 min ago
       reactions: { '🔥': 2 }
-    },
-    {
-      id: 'welcome-2',
+    });
+    const welcome2 = push(messagesRef);
+    set(welcome2, {
       side: 'coffee',
       username: 'Cold-Brew-7',
       text: 'Cold Brew wins by default. Coffee lovers rise up! 🍵',
-      timestamp: Date.now() - 60000 * 3,
+      timestamp: Date.now() - 180000, // 3 min ago
       reactions: { '😂': 1 }
-    }
-  ];
-  localStorage.setItem(CHAT_KEY, JSON.stringify(defaultMessages));
-  return defaultMessages;
-};
-
-// Setup Broadcast Channel
-const channel = new BroadcastChannel('kadak_ya_cold_brew_channel');
-
-type DbCallback = () => void;
-const listeners = new Set<DbCallback>();
-
-// Channel listener
-channel.onmessage = (event) => {
-  const { type, payload } = event.data;
-  if (type === 'new_message' || type === 'reaction' || type === 'stats_updated') {
-    // Notify all locally registered listeners
-    listeners.forEach((cb) => cb());
+    });
+    return;
   }
-};
+  const list: Message[] = [];
+  Object.keys(data).forEach((key) => {
+    const val = data[key];
+    list.push({
+      id: key,
+      side: val.side,
+      username: val.username,
+      text: val.text,
+      timestamp: val.timestamp || Date.now(),
+      reactions: val.reactions || {}
+    });
+  });
+  cachedMessages = list.sort((a, b) => a.timestamp - b.timestamp);
+  dbListeners.forEach((cb) => cb());
+});
+
+// Subscribe to Global Presence
+onValue(ref(db, 'presence'), (snapshot) => {
+  const data = snapshot.val();
+  const list: UserPresence[] = [];
+  if (data) {
+    Object.keys(data).forEach((key) => {
+      list.push(data[key]);
+    });
+  }
+  cachedPresence = list;
+  presenceListeners.forEach((cb) => cb(list));
+});
 
 export const mockDb = {
   // Subscribe to DB changes
-  subscribe(callback: DbCallback): () => void {
-    listeners.add(callback);
+  subscribe(callback: () => void): () => void {
+    dbListeners.add(callback);
+    // Trigger instantly with cached records
+    callback();
     return () => {
-      listeners.delete(callback);
+      dbListeners.delete(callback);
     };
   },
 
-  // Get current stats
   getStats(): Stats {
-    try {
-      const stored = localStorage.getItem(STATS_KEY);
-      if (stored) {
-        return checkAndRunHourlyUpdate(JSON.parse(stored));
-      }
-    } catch {}
-    return getInitialStats();
+    return cachedStats;
   },
 
-  // Record a side selection vote
   vote(side: 'chai' | 'coffee'): void {
-    const stats = this.getStats();
-    if (side === 'chai') {
-      stats.chaiCount += 1;
-    } else {
-      stats.coffeeCount += 1;
-    }
-    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
-    channel.postMessage({ type: 'stats_updated' });
-    listeners.forEach((cb) => cb());
+    const statsRef = ref(db, 'stats');
+    runTransaction(statsRef, (currentStats) => {
+      if (!currentStats) {
+        return {
+          chaiCount: side === 'chai' ? 1 : 0,
+          coffeeCount: side === 'coffee' ? 1 : 0,
+          lastUpdated: Date.now(),
+          displayedChaiPercent: 50,
+          displayedCoffeePercent: 50,
+          commentaryLine: "The match is underway!"
+        };
+      }
+      if (side === 'chai') {
+        currentStats.chaiCount = (currentStats.chaiCount || 0) + 1;
+      } else {
+        currentStats.coffeeCount = (currentStats.coffeeCount || 0) + 1;
+      }
+      return currentStats;
+    });
   },
 
-  // Get messages
   getMessages(): Message[] {
-    return getInitialMessages();
+    return cachedMessages;
   },
 
-  // Post new message
   postMessage(side: 'chai' | 'coffee', username: string, text: string): void {
-    const messages = this.getMessages();
-    const newMsg: Message = {
-      id: Math.random().toString(36).substring(2, 9),
+    const messagesRef = ref(db, 'chat/messages');
+    const newMsgRef = push(messagesRef);
+    set(newMsgRef, {
       side,
       username,
       text,
-      timestamp: Date.now(),
+      timestamp: serverTimestamp(),
       reactions: {}
-    };
-
-    messages.push(newMsg);
-
-    // Keep only last 50 for storage, last 20 will be displayed in UI
-    const truncated = messages.slice(-50);
-    localStorage.setItem(CHAT_KEY, JSON.stringify(truncated));
-
-    // Broadcast to other tabs
-    channel.postMessage({ type: 'new_message', payload: newMsg });
-    listeners.forEach((cb) => cb());
+    });
   },
 
-  // React to message
   reactToMessage(msgId: string, emoji: string): void {
-    const messages = this.getMessages();
-    const msg = messages.find((m) => m.id === msgId);
-    if (msg) {
-      msg.reactions[emoji] = (msg.reactions[emoji] || 0) + 1;
-      localStorage.setItem(CHAT_KEY, JSON.stringify(messages));
-      channel.postMessage({ type: 'reaction', payload: { msgId, emoji } });
-      listeners.forEach((cb) => cb());
-    }
+    const reactionRef = ref(db, `chat/messages/${msgId}/reactions/${emoji}`);
+    runTransaction(reactionRef, (currentCount) => {
+      return (currentCount || 0) + 1;
+    });
   },
 
-  // Force hourly stats update manually for instant testing/debugging
   forceHourlyUpdate(): void {
-    const stats = this.getStats();
-    const total = stats.chaiCount + stats.coffeeCount;
-    let chaiP = 50;
-    let coffeeP = 50;
-    if (total > 0) {
-      chaiP = Math.round((stats.chaiCount / total) * 100);
-      coffeeP = 100 - chaiP;
-    }
-    stats.displayedChaiPercent = chaiP;
-    stats.displayedCoffeePercent = coffeeP;
-    stats.commentaryLine = getCommentary(chaiP, coffeeP);
-    stats.lastUpdated = Date.now();
-    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
-    channel.postMessage({ type: 'stats_updated' });
-    listeners.forEach((cb) => cb());
+    const statsRef = ref(db, 'stats');
+    runTransaction(statsRef, (currentStats) => {
+      if (!currentStats) return currentStats;
+      const total = currentStats.chaiCount + currentStats.coffeeCount;
+      let chaiP = 50;
+      let coffeeP = 50;
+      if (total > 0) {
+        chaiP = Math.round((currentStats.chaiCount / total) * 100);
+        coffeeP = 100 - chaiP;
+      }
+      currentStats.displayedChaiPercent = chaiP;
+      currentStats.displayedCoffeePercent = coffeeP;
+      currentStats.commentaryLine = getCommentary(chaiP, coffeeP);
+      currentStats.lastUpdated = Date.now();
+      return currentStats;
+    });
   }
 };
-
-// --- Presence Management ---
-// We use a separate BroadcastChannel to track online users across tabs.
-const presenceChannel = new BroadcastChannel('kadak_presence');
-let onlineUsers: Record<string, UserPresence> = {};
-let currentPresence: UserPresence | null = null;
-const presenceListeners = new Set<(users: UserPresence[]) => void>();
-
-presenceChannel.onmessage = (event) => {
-  const { type, payload } = event.data;
-  const now = Date.now();
-
-  if (type === 'join' || type === 'heartbeat') {
-    onlineUsers[payload.sessionId] = {
-      ...payload,
-      lastSeen: now
-    };
-    notifyPresenceListeners();
-  } else if (type === 'leave') {
-    delete onlineUsers[payload.sessionId];
-    notifyPresenceListeners();
-  } else if (type === 'ping' && currentPresence) {
-    // Reply with pong/heartbeat so new tab gets current active sessions
-    presenceChannel.postMessage({ type: 'heartbeat', payload: currentPresence });
-  }
-};
-
-// Clean stale sessions (e.g., tabs that closed without 'leave' trigger)
-setInterval(() => {
-  const now = Date.now();
-  let changed = false;
-  Object.keys(onlineUsers).forEach((id) => {
-    if (now - onlineUsers[id].lastSeen > 8000) {
-      delete onlineUsers[id];
-      changed = true;
-    }
-  });
-  if (changed) notifyPresenceListeners();
-
-  // Send periodic heartbeat to keep other tabs updated and update our own local timestamp
-  if (currentPresence) {
-    onlineUsers[currentPresence.sessionId] = {
-      ...currentPresence,
-      lastSeen: now
-    };
-    presenceChannel.postMessage({ type: 'heartbeat', payload: currentPresence });
-  }
-}, 3000);
-
-function notifyPresenceListeners() {
-  const list = Object.values(onlineUsers);
-  presenceListeners.forEach((cb) => cb(list));
-}
 
 export const presenceService = {
   subscribe(callback: (users: UserPresence[]) => void): () => void {
     presenceListeners.add(callback);
-    // Immediately notify with current known users
-    callback(Object.values(onlineUsers));
-    // Request other tabs to announce themselves
-    presenceChannel.postMessage({ type: 'ping' });
+    // Instant callback
+    callback(cachedPresence);
     return () => {
       presenceListeners.delete(callback);
     };
   },
 
   join(sessionId: string, username: string, side: 'chai' | 'coffee'): void {
-    currentPresence = { sessionId, username, side, lastSeen: Date.now() };
-    onlineUsers[sessionId] = currentPresence;
-    presenceChannel.postMessage({ type: 'join', payload: currentPresence });
-    notifyPresenceListeners();
+    const presenceRef = ref(db, `presence/${sessionId}`);
+    set(presenceRef, {
+      sessionId,
+      username,
+      side,
+      lastSeen: serverTimestamp()
+    });
+    // Remove session node from Firebase automatically upon tab close / exit / system sleeps
+    onDisconnect(presenceRef).remove();
   },
 
   leave(): void {
-    if (currentPresence) {
-      presenceChannel.postMessage({ type: 'leave', payload: currentPresence });
-      delete onlineUsers[currentPresence.sessionId];
-      currentPresence = null;
-      notifyPresenceListeners();
-    }
+    // Explicit exit trigger
+    dbListeners.forEach((cb) => cb());
   }
 };
