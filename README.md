@@ -1,6 +1,6 @@
-# Kadak ya Cold Brew ? 🤔💭 🔥🍵☕
+# Kadak ya Cold Brew ? 🤔💭 
 
-**Kadak ya Cold Brew** is a real-time, interactive matchmaking web application pitting Chai lovers against Coffee enthusiasts in a live hourly tug-of-war match. Playable globally with zero authentication required! 🤼‍♂️🌍✨
+**Kadak ya Cold Brew** is a real-time, interactive web application pitting Chai lovers against Coffee enthusiasts in a live hourly tug-of-war match. Playable globally with zero authentication required! 🤼‍♂️🌍✨
 
 ---
 
