@@ -296,8 +296,12 @@ setInterval(() => {
   });
   if (changed) notifyPresenceListeners();
 
-  // Send periodic heartbeat to keep other tabs updated
+  // Send periodic heartbeat to keep other tabs updated and update our own local timestamp
   if (currentPresence) {
+    onlineUsers[currentPresence.sessionId] = {
+      ...currentPresence,
+      lastSeen: now
+    };
     presenceChannel.postMessage({ type: 'heartbeat', payload: currentPresence });
   }
 }, 3000);
