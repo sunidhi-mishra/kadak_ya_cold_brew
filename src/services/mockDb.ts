@@ -206,8 +206,8 @@ export const mockDb = {
           chaiCount: side === 'chai' ? 1 : 0,
           coffeeCount: side === 'coffee' ? 1 : 0,
           lastUpdated: Date.now(),
-          displayedChaiPercent: 50,
-          displayedCoffeePercent: 50,
+          displayedChaiPercent: side === 'chai' ? 100 : 0,
+          displayedCoffeePercent: side === 'coffee' ? 100 : 0,
           commentaryLine: "The match is underway!"
         };
       }
@@ -216,6 +216,13 @@ export const mockDb = {
       } else {
         currentStats.coffeeCount = (currentStats.coffeeCount || 0) + 1;
       }
+      
+      const total = currentStats.chaiCount + currentStats.coffeeCount;
+      if (total > 0) {
+        currentStats.displayedChaiPercent = Math.round((currentStats.chaiCount / total) * 100);
+        currentStats.displayedCoffeePercent = 100 - currentStats.displayedChaiPercent;
+      }
+      
       return currentStats;
     });
   },
@@ -258,6 +265,9 @@ export const mockDb = {
       currentStats.displayedCoffeePercent = coffeeP;
       currentStats.commentaryLine = getCommentary(chaiP, coffeeP);
       currentStats.lastUpdated = Date.now();
+      // Reset hourly sip entries back to zero for the next round
+      currentStats.chaiCount = 0;
+      currentStats.coffeeCount = 0;
       return currentStats;
     });
   }

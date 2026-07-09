@@ -32,10 +32,6 @@ export const TugOfWar: React.FC = () => {
     };
   }, []);
 
-  const handleForceUpdate = () => {
-    mockDb.forceHourlyUpdate();
-  };
-
   const chaiP = stats.displayedChaiPercent;
   const coffeeP = stats.displayedCoffeePercent;
 
@@ -68,15 +64,7 @@ export const TugOfWar: React.FC = () => {
       {/* Stats Footer Details */}
       <div className="flex justify-between items-center mt-2 text-[10px] text-softGray/40">
         <span>ENTRIES: {stats.chaiCount + stats.coffeeCount}</span>
-        <span className="flex items-center space-x-2">
-          <span>NEXT TICK: <strong className="text-creamText">{timeLeftStr || '--'}</strong></span>
-          <button 
-            onClick={handleForceUpdate}
-            className="text-[9px] px-1 py-0.5 rounded border border-neutral-800 hover:border-neutral-700 text-softGray/60 hover:text-creamText transition"
-          >
-            FORCE
-          </button>
-        </span>
+        <span>NEXT TICK: <strong className="text-creamText">{timeLeftStr || '--'}</strong></span>
       </div>
 
       {/* Live Banter line */}
