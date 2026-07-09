@@ -120,40 +120,53 @@ onValue(ref(db, 'stats'), (snapshot) => {
 const chatQuery = query(ref(db, 'chat/messages'), limitToLast(15));
 onValue(chatQuery, (snapshot) => {
   const data = snapshot.val();
-  if (!data) {
-    // Automatically seed default messages if node is empty
-    const messagesRef = ref(db, 'chat/messages');
-    const welcome1 = push(messagesRef);
-    set(welcome1, {
+  const list: Message[] = [];
+  const welcomeReactions: Record<string, Record<string, number>> = {
+    'welcome-1': { '🔥': 2 },
+    'welcome-2': { '😂': 1 }
+  };
+
+  if (data) {
+    Object.keys(data).forEach((key) => {
+      if (key === 'welcome-1' || key === 'welcome-2') {
+        if (data[key] && data[key].reactions) {
+          welcomeReactions[key] = data[key].reactions;
+        }
+        return;
+      }
+      const val = data[key];
+      list.push({
+        id: key,
+        side: val.side,
+        username: val.username,
+        text: val.text,
+        timestamp: val.timestamp || Date.now(),
+        reactions: val.reactions || {}
+      });
+    });
+  }
+
+  // Prepend simulated welcome messages client-side only
+  const welcomeMessages: Message[] = [
+    {
+      id: 'welcome-1',
       side: 'chai',
       username: 'Adrak-42',
       text: 'Welcome to Kadak Ya Cold Brew! Tap the cup to sip ☕',
       timestamp: Date.now() - 300000, // 5 min ago
-      reactions: { '🔥': 2 }
-    });
-    const welcome2 = push(messagesRef);
-    set(welcome2, {
+      reactions: welcomeReactions['welcome-1']
+    },
+    {
+      id: 'welcome-2',
       side: 'coffee',
       username: 'Cold-Brew-7',
       text: 'Cold Brew wins by default. Coffee lovers rise up! 🍵',
       timestamp: Date.now() - 180000, // 3 min ago
-      reactions: { '😂': 1 }
-    });
-    return;
-  }
-  const list: Message[] = [];
-  Object.keys(data).forEach((key) => {
-    const val = data[key];
-    list.push({
-      id: key,
-      side: val.side,
-      username: val.username,
-      text: val.text,
-      timestamp: val.timestamp || Date.now(),
-      reactions: val.reactions || {}
-    });
-  });
-  cachedMessages = list.sort((a, b) => a.timestamp - b.timestamp);
+      reactions: welcomeReactions['welcome-2']
+    }
+  ];
+
+  cachedMessages = [...welcomeMessages, ...list.sort((a, b) => a.timestamp - b.timestamp)];
   dbListeners.forEach((cb) => cb());
 });
 

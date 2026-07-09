@@ -12,6 +12,7 @@ export const App: React.FC = () => {
     side: 'chai' | 'coffee';
     username: string;
     sessionId: string;
+    loginTime: number;
   } | null>(null);
 
   const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([]);
@@ -29,9 +30,13 @@ export const App: React.FC = () => {
       setOnlineUsers(users);
     });
 
-    setMessages(mockDb.getMessages());
     const unsubscribeDb = mockDb.subscribe(() => {
-      setMessages(mockDb.getMessages());
+      const allMsgs = mockDb.getMessages();
+      // Only keep welcome messages or messages sent after the user logged in
+      const filtered = allMsgs.filter(
+        (msg) => msg.id.startsWith('welcome-') || msg.timestamp >= user.loginTime
+      );
+      setMessages(filtered);
     });
 
     const handleBeforeUnload = () => {
@@ -48,7 +53,7 @@ export const App: React.FC = () => {
   }, [user]);
 
   const handleJoin = (side: 'chai' | 'coffee', username: string, sessionId: string) => {
-    setUser({ side, username, sessionId });
+    setUser({ side, username, sessionId, loginTime: Date.now() });
     audioSynth.ensureContextStarted();
   };
 
