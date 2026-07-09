@@ -37,14 +37,20 @@ This document highlights all features, interactive mechanics, and live assets in
 ---
 
 ## 5. Live Match Tug-of-War
-*   **Sip Counter Tug-of-War**: Real-time progress bar reflecting the global matchup percentage.
-*   **Hourly Reset**: Sip counts reset to zero at the end of each hour to start a new match.
+*   **Live Match Percentages**: Real-time progress bar reflecting the global matchup percentage, calculated in real-time when new users join or sip.
+*   **Hourly Reset**: Sip counts, match percentages, commentary loop index, and session entries reset back to zero at the end of each hour to start a new match.
 *   **Live Countdown**: Visual clock displaying time left until the next hourly tick.
-*   **Cricket-Style Commentary**: Contextual live text comments analyzing the match status based on margins (e.g. tight single run, comfortable lead, or blowout innings).
-*   **Refresh Option**: Manual **REFRESH** button to query stats instantly.
+*   **Sequential Cricket-Style Commentary**: Features exactly 5 commentary lines per margin bucket (`nailBiter`, `comfortableLead`, and `blowout`) that loop sequentially on each registered slurp.
+*   **Entries Tracking**: Displays the total count of session entries (user logins) in the current 1-hour window.
 
 ---
 
-## 6. Global Backend (Firebase Realtime Database)
+## 6. Fully Responsive Viewport Stacking
+*   **Responsive Columns**: Main sections stack vertically on mobile viewports (`col-span-12 md:col-span-4`) with an optimized stack order (Tug of War top, Cup Interaction center, Banter Chat bottom).
+*   **Collapsible Controls**: Text labels for action buttons in the navigation header (e.g. `MUTED`, `SHARE`, `ONLINE`) collapse to clean icon fallbacks on narrow mobile screens.
+
+---
+
+## 7. Global Backend (Firebase Realtime Database)
 *   **Global Presence Sync**: Synchronizes active sessions globally across separate devices, network paths, and browser profiles.
 *   **Native Auto-Pruning**: Uses Firebase `onDisconnect()` listeners to remove sessions instantly if tabs are closed or connections drop.
